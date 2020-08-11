@@ -110,29 +110,31 @@ const
   DLLUtilName = 'libeay32.dll';
   {$ENDIF}
 {$ELSE}
-var
+const
   {$IFNDEF MSWINDOWS}
+  //Arrays must have same length, must describe combinations of names...
+    LIB_COUNT = 1;
     {$IFDEF DARWIN}
-    DLLSSLName: string = 'libssl.dylib';
-    DLLUtilName: string = 'libcrypto.dylib';
+    DLLSSLName: array[1..LIB_COUNT] of string = ('libssl.dylib');
+    DLLUtilName: array[1..LIB_COUNT] of string = ('libcrypto.dylib');
     {$ELSE}
      {$IFDEF OS2}
       {$IFDEF OS2GCC}
-    DLLSSLName: string = 'kssl.dll';
-    DLLUtilName: string = 'kcrypto.dll';
+    DLLSSLName: array[1..LIB_COUNT] of string = ('kssl.dll');
+    DLLUtilName: array[1..LIB_COUNT] of string = ('kcrypto.dll');
       {$ELSE OS2GCC}
-    DLLSSLName: string = 'ssl.dll';
-    DLLUtilName: string = 'crypto.dll';
+    DLLSSLName: array[1..LIB_COUNT] of string = ('ssl.dll');
+    DLLUtilName: array[1..LIB_COUNT] of string = ('crypto.dll');
       {$ENDIF OS2GCC}
      {$ELSE OS2}
-    DLLSSLName: string = 'libssl.so';
-    DLLUtilName: string = 'libcrypto.so';
+    DLLSSLName: array[1..LIB_COUNT] of string = ('libssl.so');
+    DLLUtilName: array[1..LIB_COUNT] of string = ('libcrypto.so');
      {$ENDIF OS2}
     {$ENDIF}
   {$ELSE}
-  DLLSSLName: string = 'ssleay32.dll';
-  DLLSSLName2: string = 'libssl32.dll';
-  DLLUtilName: string = 'libeay32.dll';
+  LIB_COUNT = 3;
+  DLLSSLName : array[1..LIB_COUNT] of string = ({$IFDEF WIN64}'libssl-1_1-x64.dll'   {$ELSE}'libssl-1_1.dll'   {$ENDIF}, 'ssleay32.dll', 'libssl32.dll');
+  DLLUtilName: array[1..LIB_COUNT] of string = ({$IFDEF WIN64}'libcrypto-1_1-x64.dll'{$ELSE}'libcrypto-1_1.dll'{$ENDIF}, 'libeay32.dll', 'libeay32.dll');
   {$ENDIF}
 {$ENDIF}
 
@@ -574,8 +576,8 @@ var
 
   [DllImport(DLLUtilName, CharSet = CharSet.Ansi,
     SetLastError = False, CallingConvention= CallingConvention.cdecl,
-    EntryPoint =  'SSLeay_version')]
-    function SSLeayversion(t: integer): String; external;
+    EntryPoint =  'OpenSSL_version')]
+    function OpenSSLversion(t: integer): String; external;
 
   [DllImport(DLLUtilName, CharSet = CharSet.Ansi,
     SetLastError = False, CallingConvention= CallingConvention.cdecl,
@@ -784,7 +786,7 @@ var
   function EvpGetDigestByName(Name: AnsiString): PEVP_MD;
   procedure EVPcleanup;
 //  function ErrErrorString(e: integer; buf: PChar): PChar;
-  function SSLeayversion(t: integer): Ansistring;
+  function OpenSSLversion(t: integer): Ansistring;
   procedure ErrErrorString(e: integer; var buf: Ansistring; len: integer);
   function ErrGetError: integer;
   procedure ErrClearError;
@@ -909,7 +911,7 @@ type
   TEvpPkeyAssign = function(pkey: EVP_PKEY; _type: integer; key: Prsa): integer; cdecl;
   TEvpGetDigestByName = function(Name: PAnsiChar): PEVP_MD; cdecl;
   TEVPcleanup = procedure; cdecl;
-  TSSLeayversion = function(t: integer): PAnsiChar; cdecl;
+  TOpenSSLversion = function(t: integer): PAnsiChar; cdecl;
   TErrErrorString = procedure(e: integer; buf: PAnsiChar; len: integer); cdecl;
   TErrGetError = function: integer; cdecl;
   TErrClearError = procedure; cdecl;
@@ -1014,7 +1016,7 @@ var
   _EvpPkeyAssign: TEvpPkeyAssign = nil;
   _EvpGetDigestByName: TEvpGetDigestByName = nil;
   _EVPcleanup: TEVPcleanup = nil;
-  _SSLeayversion: TSSLeayversion = nil;
+  _OpenSSLversion: TOpenSSLversion = nil;
   _ErrErrorString: TErrErrorString = nil;
   _ErrGetError: TErrGetError = nil;
   _ErrClearError: TErrClearError = nil;
@@ -1479,10 +1481,10 @@ begin
     _EvpPkeyFree(pk);
 end;
 
-function SSLeayversion(t: integer): Ansistring;
+function OpenSSLversion(t: integer): Ansistring;
 begin
-  if InitSSLInterface and Assigned(_SSLeayversion) then
-    Result := PAnsiChar(_SSLeayversion(t))
+  if InitSSLInterface and Assigned(_OpenSSLversion) then
+    Result := PAnsiChar(_OpenSSLversion(t))
   else
     Result := '';
 end;
@@ -1861,7 +1863,7 @@ end;
 function InitSSLInterface: Boolean;
 var
   s: string;
-  x: integer;
+  x, i: integer;
 begin
   {pf}
   if SSLLoaded then
@@ -1878,12 +1880,25 @@ begin
       SSLLibHandle := 1;
       SSLUtilHandle := 1;
 {$ELSE}
-      SSLUtilHandle := LoadLib(DLLUtilName);
-      SSLLibHandle := LoadLib(DLLSSLName);
-  {$IFDEF MSWINDOWS}
-      if (SSLLibHandle = 0) then
-        SSLLibHandle := LoadLib(DLLSSLName2);
-  {$ENDIF}
+      i := 1;
+      repeat
+        SSLUtilHandle := LoadLib(DLLUtilName[i]);
+        SSLLibHandle := LoadLib(DLLSSLName[i]);
+        if not ((SSLUtilHandle <> 0) and (SSLLibHandle <> 0)) then
+        begin//Both libraries were not initialized...
+          if SSLLibHandle <> 0 then
+          begin
+            FreeLibrary(SSLLibHandle);
+            SSLLibHandle := 0;
+          end;
+          if SSLUtilHandle <> 0 then
+          begin
+            FreeLibrary(SSLUtilHandle);
+            SSLUtilHandle := 0;
+          end;
+          Inc(i);//try next
+        end;
+      until (i > LIB_COUNT) or ((SSLLibHandle <> 0) and (SSLUtilHandle <> 0));
 {$ENDIF}
       if (SSLLibHandle <> 0) and (SSLUtilHandle <> 0) then
       begin
@@ -1956,7 +1971,7 @@ begin
         _EvpPkeyAssign := GetProcAddr(SSLUtilHandle, 'EVP_PKEY_assign');
         _EVPCleanup := GetProcAddr(SSLUtilHandle, 'EVP_cleanup');
         _EvpGetDigestByName := GetProcAddr(SSLUtilHandle, 'EVP_get_digestbyname');
-        _SSLeayversion := GetProcAddr(SSLUtilHandle, 'SSLeay_version');
+        _OpenSSLversion := GetProcAddr(SSLUtilHandle, 'OpenSSL_version');
         _ErrErrorString := GetProcAddr(SSLUtilHandle, 'ERR_error_string_n');
         _ErrGetError := GetProcAddr(SSLUtilHandle, 'ERR_get_error');
         _ErrClearError := GetProcAddr(SSLUtilHandle, 'ERR_clear_error');
@@ -2152,7 +2167,7 @@ begin
     _EvpPkeyAssign := nil;
     _EVPCleanup := nil;
     _EvpGetDigestByName := nil;
-    _SSLeayversion := nil;
+    _OpenSSLversion := nil;
     _ErrErrorString := nil;
     _ErrGetError := nil;
     _ErrClearError := nil;

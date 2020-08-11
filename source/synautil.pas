@@ -86,7 +86,7 @@ uses
 {$IFDEF CIL}
   System.IO,
 {$ENDIF}
-  SysUtils, Classes, SynaFpc;
+  SysUtils, Classes, SynaFpc, AnsiStrings;
 
 {$IFDEF VER100}
 type
@@ -1843,7 +1843,7 @@ begin
   if Dir = '' then
   begin
     Path := StringOfChar(#0, MAX_PATH);
-	  x := GetTempPath(Length(Path), PChar(Path));
+	  GetTempPath(Length(Path), PChar(Path));
     Path := PChar(Path);
   end
   else
@@ -2021,12 +2021,12 @@ begin
   // Moving Aptr position forward until boundary will be reached
   while (APtr<AEtx) do
     begin
-      if strlcomp(APtr,#13#10'--',4)=0 then
+      if AnsiStrings.StrLComp(APtr,#13#10'--',4)=0 then
         begin
           eob  := MatchBoundary(APtr,AEtx,ABoundary);
           Step := 4;
         end
-      else if strlcomp(APtr,'--',2)=0 then
+      else if AnsiStrings.StrLComp(APtr,'--',2)=0 then
         begin
           eob  := MatchBoundary(APtr,AEtx,ABoundary);
           Step := 2;
@@ -2059,17 +2059,17 @@ begin
   Lng := length(ABoundary);
   if (MatchPos+2+Lng)>AETX then
     exit;
-  if strlcomp(MatchPos,#13#10,2)=0 then
+  if AnsiStrings.StrLComp(MatchPos,#13#10,2)=0 then
     inc(MatchPos,2);
   if (MatchPos+2+Lng)>AETX then
     exit;
-  if strlcomp(MatchPos,'--',2)<>0 then
+  if AnsiStrings.StrLComp(MatchPos,'--',2)<>0 then
     exit;
   inc(MatchPos,2);
-  if strlcomp(MatchPos,PANSIChar(ABoundary),Lng)<>0 then
+  if AnsiStrings.StrLComp(MatchPos,PANSIChar(ABoundary),Lng)<>0 then
     exit;
   inc(MatchPos,Lng);
-  if ((MatchPos+2)<=AEtx) and (strlcomp(MatchPos,#13#10,2)=0) then
+  if ((MatchPos+2)<=AEtx) and (AnsiStrings.StrLComp(MatchPos,#13#10,2)=0) then
     inc(MatchPos,2);
   Result := MatchPos;
 end;
@@ -2084,10 +2084,10 @@ begin
   MatchPos := MatchBoundary(ABOL,AETX,ABoundary);
   if not Assigned(MatchPos) then
     exit;
-  if strlcomp(MatchPos,'--',2)<>0 then
+  if AnsiStrings.StrLComp(MatchPos,'--',2)<>0 then
     exit;
   inc(MatchPos,2);
-  if (MatchPos+2<=AEtx) and (strlcomp(MatchPos,#13#10,2)=0) then
+  if (MatchPos+2<=AEtx) and (AnsiStrings.StrLComp(MatchPos,#13#10,2)=0) then
     inc(MatchPos,2);
   Result := MatchPos;
 end;

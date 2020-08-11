@@ -96,7 +96,8 @@ uses
 {$IFDEF CIL}
   System.Text,
 {$ENDIF}
-  ssl_openssl_lib;
+  ssl_openssl_lib,
+  AnsiStrings;
 
 type
   {:@abstract(class implementing OpenSSL SSL plugin.)
@@ -176,7 +177,7 @@ begin
   if Length(Password) > (Size - 1) then
     SetLength(Password, Size - 1);
   Result := Length(Password);
-  StrLCopy(buf, PAnsiChar(Password + #0), Result + 1);
+  AnsiStrings.StrLCopy(buf, PAnsiChar(Password + #0), Result + 1);
 end;
 {$ENDIF}
 
@@ -198,7 +199,7 @@ end;
 
 function TSSLOpenSSL.LibVersion: String;
 begin
-  Result := SSLeayversion(0);
+  Result := OpenSSLversion(0);
 end;
 
 function TSSLOpenSSL.LibName: String;
